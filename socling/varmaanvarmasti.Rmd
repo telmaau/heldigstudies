@@ -1,0 +1,692 @@
+---
+title: "varmaanvarmasti"
+author: "Telma Peura"
+date: "5/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(lmerTest)
+library(ggplot2)
+library(gt)
+```
+
+# Sociolinguistics project
+
+# data
+
+```{r data}
+df = read.csv2("annotated.csv", sep="\t")
+data = read.csv2("alldata.csv", sep="\t")
+
+df$generation <- as.numeric(df$generation)*10
+class(df$generation)
+data$generation <- as.numeric(data$generation)*10
+class(data$generation)
+length(df)
+```
+
+## Descriptive stats
+
+
+
+```{r pressure, echo=FALSE}
+# adverb use per gender
+gendercount = data %>% 
+  group_by(gender) %>% 
+  summarize("gendercount"=n())
+
+summ <- data %>%
+
+  group_by(gender, adverb) %>%
+  summarize("n_speakers" = length(unique(speaker)),"count"=n())
+
+summ <- merge(summ, gendercount, by =c("gender"))
+summ$rel_count <- summ$count / summ$gendercount
+summ$rel_count <- round(summ$rel_count,3)
+summ <- select(summ, c("gender","adverb","n_speakers","count","rel_count"))
+#summ <- filter(summ, generation!="nan")
+
+# annotated sample
+
+s<-df %>%
+  group_by(adverb, generation) %>%
+  summarize(count=n()) %>%
+  ungroup()%>%
+  arrange(generation) #%>%
+s
+sample <- s %>%
+  gt() %>%
+  tab_header("Stratified sample") %>%
+  tab_style(
+    style = list(
+      cell_text(size = "small")
+     # cell_fill(color = "#F9E3D6")
+      ),
+    locations = cells_body(
+    )) %>%
+  tab_style(
+    style = list(
+     # cell_text(size = "small"),
+      cell_fill(color = "#F9E3D6")
+      ),
+    locations = cells_title(
+    )) %>%
+  cols_label(generation="Generation", count="Nr of speakers",adverb ="Adverb")# rel_count="Relative count", n_speakers ="Nr of speakers")
+
+# save
+#gtsave(
+#    data = sample,
+#    filename = "/home/telmix/Documents/opinnot/sample_adverb.png"
+#)
+
+# group by adverb
+
+
+
+mydata <- df %>%
+  group_by(party_y, generation) %>%
+  summarize(count=n())
+mydata<-ungroup(mydata)
+mydata
+length(df)
+#df %>%
+
+
+# melt
+library(reshape)
+mydata.T
+mdata <- reshape::melt(mydata, id.vars=c("generation", "party_y"), variable.name="count", value.name="sth") 
+# melt(y, id.vars=c('seq', 'detailed.name'), variable.name='T', value.name='response')
+mdata
+
+```
+
+
+```{r}
+
+table1<-summ %>%
+  
+  gt() %>%
+  tab_header("Adverb use per gender") %>%
+  tab_style(
+    style = list(
+      cell_text(size = "small")
+     # cell_fill(color = "#F9E3D6")
+      ),
+    locations = cells_body(
+    )) %>%
+  tab_style(
+    style = list(
+     # cell_text(size = "small"),
+      cell_fill(color = "#F9E3D6")
+      ),
+    locations = cells_title(
+    )) %>%
+  cols_label(gender="Gender", count="Count", adverb ="Adverb", rel_count="Relative count", n_speakers ="Nr of speakers")
+
+table1
+
+# save
+gtsave(
+    data = table1,
+    filename = "/home/telmix/Documents/opinnot/table1.png"
+)
+
+
+```
+## overall usage
+
+
+## per generation and gender for each adverb
+```{r}
+
+gendercount = data %>% 
+  group_by(gender,generation) %>% 
+  summarize("gendercount"=n())
+
+summ <- data %>%
+
+  group_by(gender, adverb,generation) %>%
+  summarize("n_speakers" = length(unique(speaker)),"count"=n())
+
+summ <- merge(summ, gendercount, by =c("gender","generation"))
+summ$rel_count <- summ$count / summ$gendercount
+summ$rel_count <- round(summ$rel_count,3)
+summ <- select(summ, c("gender","adverb","n_speakers","count","rel_count","generation"))
+summ <- filter(summ, generation!="nan")
+
+# The palette with grey:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# The palette with black:
+cbbPalette <- c("#000000", "#999999","#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# To use for fills, add
+  
+
+summ %>%
+  filter(generation < 1990) %>%
+  ggplot(aes(generation, rel_count, fill=adverb)) +
+  geom_bar(stat="identity", position="dodge")+
+  facet_wrap(~gender)+
+  theme_bw()+
+  ylab("Relative adverb use")+
+  scale_fill_manual(values=cbbPalette)+
+  #scale_fill_brewer(palette="Greys")+
+ # scale_x_discrete(breaks = generation[c(T,F,F)]) +
+  scale_x_continuous(breaks = c(1930,1940,1950,1960,1970,1980))
+  #theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  xlab("Generation")
+  #scale_x_continuous(labels= c("1940","k","l","p","i","w"))
+  
+# 
+#ggsave(filename="/home/telmix/Documents/opinnot/figure2.png" ,plot=last_plot(),width=8, height=5)
+```
+
+
+# adverb use over time
+```{r}
+library(scales)
+data$year <- as.integer(paste(substr(as.character(data$session),1,4),"",sep=""))
+data$month <- as.integer(paste(substr(as.character(data$session),6,7),"",sep=""))
+#data$month <- as.factor
+
+d<- data %>%
+  group_by(adverb,month, year, gender) %>%
+  summarize(monthly_count=n())
+
+gendercount2 = data %>% 
+  group_by(gender,month,year) %>% 
+  summarize("gendercount"=n())
+
+d <-merge(d,gendercount2, by=c("year","month","gender"))
+d$relative = round(d$monthly_count/d$gendercount,3)
+d$group <- paste(d$adverb,d$gender)
+d%>%
+  ggplot(aes(x=month, y=relative,fill=group)) +
+  geom_histogram(stat="identity", position = "dodge")+
+  facet_wrap(~year)+
+  scale_x_continuous(label = scales::label_number(accuracy = 1))+
+  scale_fill_manual(values=c("#990033", "#330066", "#FF3333",  "#3399FF"))
+
+```
+
+
+### look at the sample
+
+## per generation and age
+
+```{r}
+n_speakers<-data %>%
+  group_by(party_y,gender) %>%
+  summarize(speakers= length(unique(speaker)))
+
+adverbs<-data %>%
+  group_by(party_y,gender,adverb) %>%
+  summarize(adverb_use=n())
+
+combi <- left_join(n_speakers,adverbs, by=c("party_y","gender"))
+sum(combi$speakers)/2
+length(unique(data$speaker))
+
+combi$rel <- round(combi$adverb_use / combi$speakers, 2)
+
+#combi %>%
+#  ggplot()
+combi$party_y <- as.factor(combi$party_y)
+combi$adverb <- as.factor(combi$adverb)
+combi$gender <- as.factor(combi$gender)
+
+#model <- glm(adverb ~ party_y*gender+(1|session), df, family="binomial")
+#summary(model)
+combi$adverbgender <- paste(combi$gender,as.character(combi$adverb))
+
+combi %>%
+  ggplot(aes(party_y,rel,color=adverbgender))+
+  geom_point()
+```
+
+
+
+## party
+
+```{r}
+
+df$adverb <- as.factor(df$adverb)
+df$generation <- as.factor(df$generation)
+df$party_y <- as.factor(df$party_y)
+df$probability <- as.factor(df$probability)
+df$certainty <- as.factor(df$certainty)
+df$gender <- as.factor(df$gender)
+#df$date <- as.date
+# only gender
+model <- glm(adverb ~ gender, df, family="binomial")
+summary(model)
+
+# only generation
+model2 <- glm(adverb ~ generation, df, family="binomial")
+summary(model2)
+
+# only party
+model3 <- glm(adverb ~ party_y, df, family="binomial")
+summary(model3)
+
+
+# interaction
+i1 <- glm(adverb ~ gender*generation, df, family="binomial")
+summary(i1) # not significant
+
+
+i2 <- glm(adverb ~ gender*party_y, df, family="binomial")
+summary(i2) # some significant
+
+
+# control for session (time)
+genderModel <- glmer(adverb ~ gender+(1|date), df, family="binomial")
+summary(genderModel) # significant
+
+exp(coef(model3))
+
+complex2 <- glmer(adverb ~ generation+(1|date), df, family="binomial")
+summary(complex2) # significant
+
+
+complex3 <- glmer(adverb ~ party_y+(1|date), df, family="binomial")
+summary(complex3) # some significant
+
+
+# rhetorics
+
+complex4 <- glmer(adverb ~ gender*probability+(1|date), df, family="binomial")
+summary(complex4) # some significant
+
+
+complex4 <- glmer(adverb ~ probability*gender+(1|date), df, family="binomial")
+summary(complex4) # some significant
+
+
+#generation shift
+df$probability <- as.factor(df$probability)
+df$generation <- as.numeric(df$generation)
+model_g <- glmer(adverb ~generation*probability+(1|session), df, family="binomial", control = glmerControl(calc.derivs = FALSE))
+model_g <- lmer(generation ~adverb*probability+(1|date), df)#,control = glmerControl(calc.derivs = FALSE))
+summary(model_g)
+```
+
+# H1
+
+```{r}
+
+mod1 <- glmer(adverb ~ gender+(1|date), df, family="binomial")
+summary(mod1) # significant
+exp(fixef(complex))
+pframe0 <- with(df, expand.grid(gender=levels(gender)))
+
+pframe0
+mm <- model.matrix(~gender,data=pframe0)
+mm
+
+#newdat <- data.frame(Days=d,
+#   age=factor(rep(levels(sleep$age),length(d))))
+
+mm <- model.matrix(formula(complex,fixed.only=TRUE)[-2], pframe0)
+#mm <- mm[,-which.dropped]   ## drop redundant columns
+## newdat$pred <- mm%*%fixef(m4)    ## works now
+
+pframe1 <- data.frame(pframe0,eta=mm%*%fixef(complex))
+pframe1
+pframe1 <- with(pframe1,data.frame(pframe1,adverb=invlogit(eta)))
+
+pframe1$pse <- diag(mm %*% tcrossprod(vcov(complex), mm))
+pframe1$hi <- with(pframe1, eta + 1.96*pse)
+pframe1$low <- with(pframe1, eta - 1.96*pse)
+pframe1$hi.prob <- invlogit(pframe1$hi)
+pframe1$low.prob <- invlogit(pframe1$low)
+pframe1
+
+
+library(broom.mixed)
+H1 <- tidy(complex,conf.int=TRUE,exponentiate=TRUE,effects="fixed")
+summary(complex)
+H1$model <- "model 1"
+#p.val(complex)
+H1$z_val <- c(4.166,-2.463)
+H1$p_val <- c("3.1e-05 ***", "0.0138 *")
+```
+
+# H2
+
+```{r}
+names(df)[names(df) == 'probability'] <- 'adverb_function'
+mod2<- glmer(adverb ~ certainty*generation+(1|date), df, family="binomial")
+H2 <- tidy(mod2,conf.int=TRUE,exponentiate=TRUE,effects="fixed")
+summary(mod2)
+H2
+
+H2$model <- "model 2"
+```
+
+# H3
+
+```{r}
+#colnames
+
+mod3<- glmer(adverb ~ gender*adverb_function+(1|date), df, family="binomial")
+H3 <- tidy(mod3,conf.int=TRUE,exponentiate=TRUE,effects="fixed")
+summary(mod3)
+H3
+H3$model <- "model 3"
+```
+
+
+
+
+# table for the results
+
+```{r}
+
+library(sjPlot)
+
+
+# merge the models
+results <- rbind(H1,H2,H3)
+results
+results$confint <- paste(round(results$conf.low,2), round(results$conf.high,2), sep=", ")
+results$confint <-paste("[", results$confint, sep="")
+results$confint <-paste(results$confint, "]",sep="")
+
+#results <- results%>%
+results_num <- results%>% dplyr::select(where(is.numeric))
+results_num <-data.frame(sapply(results_num, function(x) round(x,3) )  )
+
+results_num$model <- results$model
+results_num$confint <- results$confint
+results_num
+#  select(model, term, estimate,st)
+results_num <- results_num %>%
+  dplyr::select(model, estimate, confint, statistic, p.value)
+
+results_num
+
+
+# nice table
+tab_df(results_num)
+tab_model(mod2,show.ngroups = F, show.re.var=F, show.icc=F, show.stat = T)
+
+tab_model(mod3,show.ngroups = F, show.re.var=F, show.icc=F, show.stat = T)
+
+tab_model(complex3,show.ngroups = F, show.re.var=F, show.icc=F, show.stat = T)
+
+```
+
+
+
+
+
+```{r}
+library(arm)
+# https://rpubs.com/mcgill_linguistics/63173
+# sapply(df, function(x) max(as.character(x)) )  
+#complex <- glmer(adverb ~ gender*generation+(1|session), df, family="binomial")
+#summary(complex) # significant
+mod2<- glmer(adverb ~ certainty*generation+(1|date), df, family="binomial")
+
+# do this with mod2
+pframe0 <- with(df, expand.grid(gender=levels(gender),adverb_function=levels(adverb_function)))
+
+pframe0
+mm <- model.matrix(~gender*adverb_function,data=pframe0)
+mm
+
+#newdat <- data.frame(Days=d,
+#   age=factor(rep(levels(sleep$age),length(d))))
+
+mm <- model.matrix(formula(mod3,fixed.only=TRUE)[-2], pframe0)
+#mm <- mm[,-which.dropped]   ## drop redundant columns
+## newdat$pred <- mm%*%fixef(m4)    ## works now
+
+pframe1 <- data.frame(pframe0,eta=mm%*%fixef(mod3))
+pframe1
+pframe1 <- with(pframe1,data.frame(pframe1,adverb=invlogit(eta)))
+
+pframe1$pse <- diag(mm %*% tcrossprod(vcov(mod3), mm))
+pframe1$hi <- with(pframe1, eta + 1.96*pse)
+pframe1$low <- with(pframe1, eta - 1.96*pse)
+pframe1$hi.prob <- invlogit(pframe1$hi)
+pframe1$low.prob <- invlogit(pframe1$low)
+
+# plot
+# The palette with grey:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# The palette with black:
+cbbPalette <- c("#000000", "#999999","#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+ggplot(aes(x=adverb_function, ymin=low.prob, ymax=hi.prob,y=adverb), data=pframe1) + geom_errorbar(aes(color=gender),width=0.2) + geom_point(aes(color=gender)) + coord_cartesian(ylim=c(0, 1)) +
+  theme_bw()+
+    #scale_colour_manual(values=cbPalette)
+  xlab("Adverb function")+
+  ylab("Adverb probability (0=varmaan, 1=varmasti)")
+
+
+##
+
+
+
+predicted_df <- data.frame(mpg_pred = predict(complex, df), hp=df$)
+
+library(effects)
+ef <- effect("gender", mod1)
+x <- as.data.frame(ef)
+x
+
+
+ef <- effect("generation", complex2)
+x <- as.data.frame(ef)
+x
+
+summary(complex)
+library(interactions)
+cat_plot(mod1, pred = gender)
+
+ef <- effect("party_y:generation", complex3)
+x <- as.data.frame(ef)
+
+x %>%
+  ggplot(aes(x=gender, y=fit))+
+  geom_point()+
+  geom_errorbar(aes(x=gender, ymin=fit-se, ymax=fit+se), width=0.3, colour="orange", alpha=0.9, size=0.9)
+
+
+
+
+df$adverbnum <- as.factor(df$adverb)
+df$gender <- as.factor(df$gender)
+df$certainty <- as.factor(df$certainty)
+complex <- glmer(gender ~ probability+(1|session), df, family="binomial")
+complexnull <- glmer(certainty ~gender+ (1|session), df, family="binomial")#
+complex <- glmer(certainty ~ generation+party_y+(1|session), df, family="binomial")#
+anova(complexnull, complex)
+summary(complex) # significant
+
+plot(adverbnum ~gendernum, data = df, pch = 20,
+     ylab = "Estimated Probability", 
+     main = "Ordinary vs Logistic Regression")
+grid()
+
+
+#abline(complex, col = "darkorange")
+curve(predict(complex, data.frame(gendernum), type = "response"), 
+      add = TRUE, col = "dodgerblue", lty = 2)
+legend("topleft", c("Ordinary", "Logistic", "Data"), lty = c(1, 2, 0), 
+       pch = c(NA, NA, 20), lwd = 2, col = c("darkorange", "dodgerblue", "black"))
+
+
+plot(allEffects(complex3))
+summary(complex3)
+# intercept = varmaan, beta = varmasti
+```
+
+```{r}
+# gender
+# do this with mod2
+pframe0 <- with(df, expand.grid(gender=levels(gender)))
+
+pframe0
+mm <- model.matrix(~gender,data=pframe0)
+mm
+
+#newdat <- data.frame(Days=d,
+#   age=factor(rep(levels(sleep$age),length(d))))
+
+mm <- model.matrix(formula(complex,fixed.only=TRUE)[-2], pframe0)
+#mm <- mm[,-which.dropped]   ## drop redundant columns
+## newdat$pred <- mm%*%fixef(m4)    ## works now
+
+pframe1 <- data.frame(pframe0,eta=mm%*%fixef(complex))
+pframe1
+pframe1 <- with(pframe1,data.frame(pframe1,adverb=invlogit(eta)))
+
+pframe1$pse <- diag(mm %*% tcrossprod(vcov(complex), mm))
+pframe1$hi <- with(pframe1, eta + 1.96*pse)
+pframe1$low <- with(pframe1, eta - 1.96*pse)
+pframe1$hi.prob <- invlogit(pframe1$hi)
+pframe1$low.prob <- invlogit(pframe1$low)
+
+# plot
+# The palette with grey:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# The palette with black:
+cbbPalette <- c("#000000", "#999999","#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+ggplot(aes(x=gender, ymin=low.prob, ymax=hi.prob,y=adverb), data=pframe1) + geom_errorbar(aes(color=gender),width=0.2) + geom_point(aes(color=gender)) + coord_cartesian(ylim=c(0, 1)) +
+  theme_bw()+
+    #scale_colour_manual(values=cbPalette)
+  xlab("Gender")+
+  ylab("Adverb probability (0=varmaan, 1=varmasti)")+
+  theme(plot.margin = margin(1,2.8,.8,2.8, "cm"))
+
+
+```
+
+# political party
+```{r}
+# big model
+data$adverb <- as.factor(data$adverb)
+data$party_y <- as.factor(data$party)
+data$generation <- as.factor(data$generation)
+complex <- glmer(adverb ~ party_y+(1|date), data, family="binomial")
+complex2 <- glmer(adverb ~ party_y*gender+(1|date), data, family="binomial")
+
+complex3 <- glmer(adverb ~ party_y*generation+(1|date), data, family="binomial",control = glmerControl(calc.derivs = FALSE))
+summary(complex3)
+pframe0 <- with(df, expand.grid( party_y=levels(party_y), generation=levels(generation)))
+
+pframe0 <- newdf
+mm <- model.matrix(~party_y*generation,data=newdf)
+mm
+
+
+
+#newdat <- data.frame(Days=d,
+#   age=factor(rep(levels(sleep$age),length(d))))
+
+mm <- model.matrix(formula(complex3,fixed.only=TRUE)[-2], newdf)
+#mm <- mm[,-which.dropped]   ## drop redundant columns
+## newdat$pred <- mm%*%fixef(m4)    ## works now
+mm
+newdf<- data.frame(newdf,eta=fixef(complex3)%*%mm)#mm%*%fixef(complex3))
+#pframe1
+newdf
+newdf <- with(newdf,data.frame(pframe1,adverb=invlogit(eta)))
+
+pframe1$pse <- diag(mm %*% tcrossprod(vcov(complex2), mm))
+pframe1$hi <- with(pframe1, eta + 1.96*pse)
+pframe1$low <- with(pframe1, eta - 1.96*pse)
+pframe1$hi.prob <- invlogit(pframe1$hi)
+pframe1$low.prob <- invlogit(pframe1$low)
+
+# plot
+# The palette with grey:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# The palette with black:
+cbbPalette <- c("#000000", "#999999","#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+ggplot(aes(x=party_y, ymin=low.prob, ymax=hi.prob,y=adverb), data=pframe1) + geom_errorbar(aes(color=gender),width=0.2) + geom_point(aes(color=gender)) + coord_cartesian(ylim=c(0, 1)) +
+  theme_bw()+
+    #scale_colour_manual(values=cbPalette)
+  xlab("Gender")+
+  ylab("Adverb probability (0=varmaan, 1=varmasti)")
+#tab_model(complex3,show.ngroups = F, show.re.var=F, show.icc=F, show.stat = T)
+
+newdf <- data %>%
+  group_by(party_y, generation) %>%
+  summarise(count= n())
+newdf <- dplyr::select(newdf, ! count)
+
+
+
+d1 <- data %>%
+  group_by(generation, party_y) %>%
+  summarize(speechcount= n()) 
+
+d2<- data %>%
+  group_by(generation, party_y,adverb) %>%
+  summarize(adverbcount= n()) 
+
+d3<-left_join(d1,d2, by=c("generation","party_y"))
+d3$party_adverb <- paste(d3$adverb,d3$party_y)
+d3$rel <- d3$adverbcount/d3$speechcount
+#%>%
+ # ungroup() %>%
+#  group_by()
+#adverb) %>%
+d3$generation <- as.numeric(d3$generation)
+names(d3)[names(d3) == 'party_y'] <- 'party'
+d3 %>%
+  filter(generation != 1990) %>%
+  filter(generation != "nan") %>%
+  filter(adverb=="varmaan") %>%
+  #summarise(count=n())%>%
+  ggplot(aes(x=generation, y=rel,  fill=party, color=party))+
+  #geom_bar(stat="summary", position="dodge") +
+  geom_point()+
+  geom_line()+
+  #facet_wrap(~adverb)+
+  theme_bw()+
+  ylab("the relative proportion of varmaan")+#+
+  scale_x_continuous( breaks=c(1,2,3,4,5,6),labels = c("1930","1940","1950","1960","1970","1980"))
+  #geom_line(
+```
+
+
+# by probability and certainty
+```{r}
+
+df %>%
+  group_by(probability, gender) %>%
+  summarise("counts"=n())
+
+gen <- df %>%
+  group_by( generation) %>%
+  summarise("counts"=n())
+
+gencounts <- df %>%
+  group_by( generation,adverb) %>%
+  summarise("counts2"=n())
+
+gendf <- merge(gencounts, gen, by ="generation", all=T)
+gendf$rel <- gendf$counts2/gendf$counts
+
+gendf %>%
+  ggplot(aes(x=generation,y=rel, fill=adverb)) +
+  geom_bar(stat="identity", position="dodge")
+df %>%
+  group_by(party_y, certainty) %>%
+  summarise("counts"=n())
+
+
+```
+
